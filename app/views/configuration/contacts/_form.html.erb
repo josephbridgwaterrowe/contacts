@@ -1,0 +1,125 @@
+<% content_for :script do %>
+    <script>
+        <%= render partial: 'type_aheads/contact_type_ahead', formats: [:js] %>
+    </script>
+<% end %>
+<%= render partial: '/model_errors', locals: { model: contact } %>
+
+<fieldset>
+  <%= form.input :first_name, as: :string,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+  <%= form.input :initials, as: :string,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+  <%= form.input :last_name, as: :string,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+  <%= form.input :display_name, as: :string,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+  <%= form.input :description, as: :string,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+  <%= form.input :office, as: :string,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+
+  <%= form.input :email_address, as: :string,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control', type: :email } %>
+  <%= form.input :phone_number, as: :string,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+  <%= form.input :pager_number, as: :string,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+  <%= form.input :mobile_number, as: :string,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+  <%= form.input :fax_number, as: :string,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+
+  <%= form.input :street_address, as: :string, label: 'Address',
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+  <%= form.input :city, as: :string,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+  <%= form.input :region, as: :string, label: 'State',
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+  <%= form.input :postal_code, as: :string, label: 'Zip Code',
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+
+  <%= form.input :company, as: :string,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+  <%= form.input :department, as: :string,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+  <%= form.input :job_title, as: :string,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+
+
+  <%= form.input :managing_contact_id, :as => :hidden, input_html: { value: contact.managing_contact_id } %>
+  <div class="form-group contact">
+    <label for="contact-typeahead" class="col-lg-4 control-label">Manager</label>
+    <div class="col-lg-8">
+      <div class="input-group">
+        <input type="text"
+               class="form-control required typeahead"
+               autocomplete="off"
+               id="contact-typeahead" <% if contact.manager %>value="<%= contact.manager %>"<% end %> />
+                <span class="input-group-btn">
+              <button class="btn btn-default clear-typeahead" type="button" data-clear-typeahead-text=".contact .typeahead" data-clear-typeahead-value="input[id*=managing_contact_id]"><span class="glyphicon glyphicon-remove-sign"></span></button>
+                </span>
+      </div>
+    </div>
+  </div>
+
+
+  <%= form.input :contact_type,
+                 :collection => @contact_types,
+                 controls_html: { class: 'col-lg-4' },
+                 label_html: { class: 'col-lg-4' },
+                 input_html: { class: 'form-control' } %>
+
+  <div class="form-group">
+    <label for="" class="col-lg-4 control-label">Active?</label>
+    <div class="col-lg-8">
+      <div class="btn-group" data-toggle="buttons">
+        <label class="btn btn-default<% if contact.active? %> active<% end %>">
+          <%= form.radio_button :is_active, 1,
+                             checked: contact.active? ? 'checked' : nil %> Yes
+        </label>
+        <label class="btn btn-default<% if !contact.active? %> active<% end %>">
+          <%= form.radio_button :is_active, 0,
+                             checked: !contact.active? ? 'checked' : nil %> No
+        </label>
+      </div>
+    </div>
+  </div>
+
+</fieldset>

@@ -1,0 +1,19 @@
+container-fluid:before,
+ container-fluid:after {
+   display:table;
+   content:" ";
+ }
+
+container-fluid:after {
+  clear: both;
+}
+
+container-fluid:before,
+container-fluid:after {
+  display: table;
+  content: " ";
+}
+
+container-fluid:after {
+  clear: both;
+}

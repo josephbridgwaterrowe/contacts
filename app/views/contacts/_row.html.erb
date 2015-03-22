@@ -1,0 +1,19 @@
+<tr>
+  <td nowrap><%= contact.display_name %>
+    <br /><%= contact.position_string %>
+  </td>
+  <td>
+    <%= location(contact) %>
+  </td>
+  <td nowrap>
+    <% if contact.email_address.present? %>E: <%= contact.email_address %><br /><% end %>
+    <% if contact.phone_number.present? %>P: <%= number_to_phone(contact.phone_number, area_code: true) %><br /><% end %>
+    <% if contact.mobile_number.present? %>M: <%= number_to_phone(contact.mobile_number, area_code: true) %><br /><% end %>
+    <% if contact.fax_number.present? %>F: <%= number_to_phone(contact.fax_number, area_code: true) %><br /><% end %>
+  </td>
+  <td nowrap>
+    <%= link_to contact_path(contact, return_url: request.original_url), class: 'btn btn-default btn-icon btn-sm' do %>
+        <span class="glyphicon glyphicon-eye-open"></span>
+    <% end %>
+  </td>
+</tr>

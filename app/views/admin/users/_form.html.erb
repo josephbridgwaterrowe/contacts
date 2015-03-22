@@ -1,0 +1,49 @@
+<%= simple_form_for([:admin, user], html: { class: 'form-horizontal', id: 'user-form' }) do |f| %>
+    <div class="page-header">
+      <h3><% if user.new_record? %>New<% else %>Edit<% end %> User<small></small>
+        <span class="pull-right">
+          <input type="submit" class="btn btn-primary" value="Save" />
+          <%= link_to 'Cancel', params[:return_url] || admin_users_path(), class: 'btn btn-default' %>
+        </span>
+      </h3>
+    </div>
+
+    <%= render partial: '/model_errors', locals: { model: user } %>
+
+    <fieldset>
+      <div class="form-group">
+        <label class="col-lg-4 control-label">Name</label>
+        <div class="col-lg-8">
+          <p class="form-control-static"><%= user.name %></p>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="" class="col-lg-4 control-label">Active?</label>
+        <div class="col-lg-8">
+          <div class="btn-group" data-toggle="buttons">
+            <label class="btn btn-default<% if user.active? %> active<% end %>">
+              <%= f.radio_button :is_active, 1,
+                                 checked: user.active? ? 'checked' : nil %> Yes
+            </label>
+            <label class="btn btn-default<% if !user.active? %> active<% end %>">
+              <%= f.radio_button :is_active, 0,
+                                 checked: !user.active? ? 'checked' : nil %> No
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="col-lg-4 control-label">Roles</label>
+        <div class="col-lg-8">
+          <div class="btn-group" data-toggle="buttons">
+            <% roles.each do |role| %>
+                <label class="btn btn-default<% if user.has_role?(role.to_sym) %> active<% end %>">
+                  <%= check_box_tag 'role_names[]', role, user.has_role?(role.to_sym) %> <%= role %>
+                </label>
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+    </fieldset>
+<% end %>

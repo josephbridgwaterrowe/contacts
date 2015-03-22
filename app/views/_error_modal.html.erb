@@ -1,0 +1,36 @@
+<div class="modal fade" id="error-modal" tabindex="-1" role="dialog" aria-labelledby="error-modal-label" aria-hidden="true">
+  <div class="modal-dialog" style="width: 80%;">
+    <div class="modal-content" style="xwidth: 600px;">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+            <h4 class="modal-title">Error</h4>
+          </div>
+          <div class="modal-body">
+            <% if exception %>
+                <div class="alert alert-danger">
+                  <h4 class="alert-heading" style="margin: 0;">
+                    <%= exception.message %>
+                  </h4>
+                  <p style="font-family: Courier; font-size: 10px; overflow: scroll;">
+                    <%= exception.backtrace.join('<br />').html_safe %>
+                  </p>
+                </div>
+            <% end %>
+            <% if errors && errors.any? %>
+                <div id="error_explanation" class="alert alert-danger">
+                  <h4 class="alert-heading"><%= pluralize(errors.count, 'error') %> prohibited this action from completing:</h4>
+                  <ul>
+                    <% errors.message_list.each do |msg| %>
+                        <li><%= msg %></li>
+                    <% end %>
+                  </ul>
+                </div>
+            <% end %>
+
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+          </div>
+    </div><!-- /.modal-content -->
+  </div><!-- /.modal-dialog -->
+</div>
