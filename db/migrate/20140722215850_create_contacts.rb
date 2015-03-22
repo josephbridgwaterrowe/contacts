@@ -35,7 +35,8 @@ class CreateContacts < ActiveRecord::Migration
       t.string :external_reference
       t.string :external_source
 
-      t.timestamps
+      t.datetime :deleted_at
+      t.timestamps :null => false
     end
   end
 end

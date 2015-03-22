@@ -12,8 +12,8 @@ class ContactsController < ApplicationController
 
     @contacts = results.to_a
 
-    @contacts_by_company = results.group_by { |contact| 
-      contact.company.nil? || contact.company.strip.blank? ? 'No Company' : contact.company.strip 
+    @contacts_by_company = results.group_by { |contact|
+      contact.company.nil? ? 'No Company' : contact.company.name
     }
 
     respond_to do |format|
@@ -27,5 +27,4 @@ class ContactsController < ApplicationController
   def show
     @contact = Contact.find(params[:id])
   end
-
 end

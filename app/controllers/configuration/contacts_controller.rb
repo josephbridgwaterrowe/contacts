@@ -1,19 +1,22 @@
 class Configuration::ContactsController < ApplicationController
   authorize_resource :contact
 
-  before_filter :populate_lists
+  before_action :find_contact, :only => [:destroy, :edit, :show, :update]
+  before_action :populate_lists
+  before_action :load_companies, :only => [:create, :new, :edit, :update]
+  before_action :load_departments, :only => [:create, :new, :edit, :update]
 
   def create
     @contact = Contact.new(contact_params)
     if @contact.save
-      redirect_to(configuration_contact_path(@contact), notice: 'Contact created')
+      redirect_to(configuration_contact_path(@contact.id),
+                  :notice => t('app.contact.create.success'))
     else
       render :new
     end
   end
 
   def destroy
-    @contact = Contact.find(params[:id])
     if @contact.destroy
       redirect_to(configuration_contacts_path(), notice: 'Contact removed')
     else
@@ -21,9 +24,7 @@ class Configuration::ContactsController < ApplicationController
     end
   end
 
-  def edit
-    @contact = Contact.find(params[:id])
-  end
+  def edit; end
 
   def index
     if params[:q] == nil
@@ -32,7 +33,7 @@ class Configuration::ContactsController < ApplicationController
 
     query_params = params[:q].clone
 
-    # No company filtering hack, implement a nice way of doing this... 
+    # No company filtering hack, implement a nice way of doing this...
     # for instance, populate the company with No Company during import.
     if query_params[:company_eq] && query_params[:company_eq] == 'No Company'
       query_params.delete(:company_eq)
@@ -52,14 +53,12 @@ class Configuration::ContactsController < ApplicationController
     @contact = Contact.new
   end
 
-  def show
-    @contact = Contact.find(params[:id])
-  end
+  def show; end
 
   def update
-    @contact = Contact.find(params[:id])
     if @contact.update_attributes(contact_params)
-      redirect_to(configuration_contact_path(@contact), notice: 'Contact updated')
+      redirect_to(configuration_contact_path(@contact.id),
+                  :notice => t('app.contact.update.success'))
     else
       render :edit
     end
@@ -87,22 +86,41 @@ class Configuration::ContactsController < ApplicationController
                :region,
                :state,
                :postal_code,
+               :company_id,
+               :department_id,
                :company,
                :department,
+               :company_name,
+               :department_name,
                :job_title,
                :managing_contact_id,
                :is_active)
+  rescue ActionController::ParameterMissing; {}
+  end
 
+  def find_contact
+    @contact = Contact.find(params[:id])
+  end
+
+  def load_companies
+    @companies = Company.order { name }.to_a
+  end
+
+  def load_departments
+    return @departments = [] if @contact.company.nil?
+
+    @departments = Department
+      .where { company_id == my { @contact.company_id } }
+      .order { name }
+      .to_a
   end
 
   def populate_lists
     @active_inactive_list = [[:active, 1], [:inactive, 0]]
     @contact_types = %w{group unknown user}
-    @company_list = Contact.select { company }.
-      map { |x| x.company.nil? || x.company.strip.blank? ? 'No Company' : x.company.strip }.
+    @company_list = Contact.select { company_name }.
+      map { |x| x.company_name.nil? || x.company_name.strip.blank? ? 'No Company' : x.company_name.strip }.
       uniq.
       sort
   end
-
-
 end

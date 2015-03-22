@@ -1,6 +1,21 @@
 <% content_for :script do %>
     <script>
-        <%= render partial: 'type_aheads/contact_type_ahead', formats: [:js] %>
+        <%= render partial: 'typeaheads/contact_typeahead', formats: [:js] %>
+
+        $('#contact_company_id').change(function() {
+          var company_id = $(this).val();
+          $.ajax({
+            url: '<%= departments_path %>',
+            data: { q: { company_id_eq: company_id } }
+          }).success(function(data) {
+            $('#contact_department_id').empty();
+            $('#contact_department_id').append($('<option value="">None</option>'));
+            $.each(data, function(index, object) {
+              var option = $('<option />').text(object.name).val(object.id);
+              $('#contact_department_id').append(option);
+            });
+          });
+        });
     </script>
 <% end %>
 <%= render partial: '/model_errors', locals: { model: contact } %>
@@ -69,11 +84,22 @@
                  label_html: { class: 'col-lg-4' },
                  input_html: { class: 'form-control' } %>
 
-  <%= form.input :company, as: :string,
+  <%= form.input :company_id,
+                 :collection => companies,
+                controls_html: { class: 'col-lg-4' },
+                label_html: { class: 'col-lg-4' },
+                input_html: { class: 'form-control' } %>
+  <%= form.input :company_name, as: :string,
                  controls_html: { class: 'col-lg-4' },
                  label_html: { class: 'col-lg-4' },
                  input_html: { class: 'form-control' } %>
-  <%= form.input :department, as: :string,
+  <%= form.input :department_id,
+                 :collection => departments,
+                 :include_blank => 'None',
+                controls_html: { class: 'col-lg-4' },
+                label_html: { class: 'col-lg-4' },
+                input_html: { class: 'form-control' } %>
+  <%= form.input :department_name, as: :string,
                  controls_html: { class: 'col-lg-4' },
                  label_html: { class: 'col-lg-4' },
                  input_html: { class: 'form-control' } %>
@@ -98,7 +124,6 @@
       </div>
     </div>
   </div>
-
 
   <%= form.input :contact_type,
                  :collection => @contact_types,

@@ -9,6 +9,8 @@ class Ability
     end
 
     if user.has_role?(:contact_admin)
+      # can :read, Company
+      # can :update, Company
       can :read, Contact
       can :update, Contact
     end

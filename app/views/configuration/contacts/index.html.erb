@@ -29,8 +29,8 @@
           <div class="form-group">
             <label for="order_status_eq" class="col-lg-4 control-label">Company</label>
             <div class="col-lg-8">
-              <%= f.select(:company_eq,
-                           options_for_select(@company_list, selected: (params && !params[:q].nil?) ? params[:q][:company_eq] : nil),
+              <%= f.select(:company_name_eq,
+                           options_for_select(@company_list, selected: (params && !params[:q].nil?) ? params[:q][:company_name_eq] : nil),
                            { include_blank: 'All' },
                            { class: 'select form-control' }) %>
             </div>

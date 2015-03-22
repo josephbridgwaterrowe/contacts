@@ -2,7 +2,7 @@ root =  File.expand_path('../../', __FILE__)
 working_directory root
 pid "#{root}/tmp/pids/unicorn.pid"
 
-listen '/tmp/unicorn.contacts.sock'
+listen 3000
 
 if ENV['RAILS_ENV'] == 'development'
   worker_processes 1

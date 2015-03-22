@@ -1,0 +1,20 @@
+<div class="row">
+  <div class="col-lg-3"></div>
+  <div class="col-lg-6">
+    <%= simple_form_for([:configuration, @company],
+                        :as => :company,
+                        :html => { :class => 'form-horizontal' }) do |f| %>
+        <div class="page-header">
+          <h3>New Company<small></small>
+            <span class="pull-right">
+              <input type="submit" class="btn btn-primary" value="Save" />
+              <%= link_to 'Cancel', params[:return_url] || configuration_companies_path(), class: 'btn btn-default' %>
+            </span>
+          </h3>
+        </div>
+
+        <%= render :partial => 'form', locals: { form: f, company: @company } %>
+    <% end %>
+  </div>
+  <div class="col-lg-3"></div>
+</div>

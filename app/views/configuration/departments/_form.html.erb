@@ -1,0 +1,15 @@
+<% content_for :script do %>
+<% end %>
+<%= render partial: '/model_errors', locals: { model: department } %>
+
+<fieldset>
+  <%= form.input :name, :as => :string,
+                 :controls_html => { :class => 'col-lg-4' },
+                 :label_html => { :class => 'col-lg-4' },
+                 :input_html => { :class => 'form-control' } %>
+ <%= form.input :company_id,
+                :collection => companies,
+                :controls_html => { :class => 'col-lg-4' },
+                :label_html => { :class => 'col-lg-4' },
+                :input_html => { :class => 'form-control' } %>
+</fieldset>
