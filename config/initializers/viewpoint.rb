@@ -1,0 +1,6 @@
+# # require 'viewpoint/exchange_web_service'
+# require 'viewpoint/ews_builder'
+# require 'viewpoint/templates/contact'
+# require 'viewpoint/types/contact'
+# require 'viewpoint/types/calendar_folder'
+# require 'viewpoint/types/contacts_folder'

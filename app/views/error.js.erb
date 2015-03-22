@@ -1,0 +1,10 @@
+var el = $('<%=j render partial: '/error_modal', locals: { errors: @errors || [], exception: @exception } %>');
+
+if ($('#error-modal').length == 0) {
+    $('body').append(el);
+    el.modal()
+            .on('hidden.bs.modal', function () { $(this).remove(); })
+            .on('shown.bs.modal', function () { });
+} else {
+    $('.modal-body').replaceWith(el.find('.modal-body'));
+}

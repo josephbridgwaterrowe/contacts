@@ -1,0 +1,1429 @@
+=begin
+  This file is part of Viewpoint; the Ruby library for Microsoft Exchange Web Services.
+
+  Copyright © 2011 Dan Wanek <dan.wanek@gmail.com>
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+=end
+module Viewpoint::EWS::SOAP
+
+  # This class includes the element builders. The idea is that each element should
+  # know how to build themselves so each parent element can delegate creation of
+  # subelements to a method of the same name with a '!' after it.
+  class EwsBuilder
+    include Viewpoint::EWS
+
+    attr_reader :nbuild
+    def initialize
+      @nbuild = Nokogiri::XML::Builder.new
+    end
+
+    # Build the SOAP envelope and yield this object so subelements can be built. Once
+    # you have the EwsBuilder object you can use the nbuild object like shown in the
+    # example for the Header section. The nbuild object is the underlying
+    # Nokogiri::XML::Builder object.
+    # @param [Hash] opts
+    # @option opts [String] :server_version The version string that should get
+    #   set in the Header. See ExchangeWebService#initialize
+    # @option opts [Hash] :time_zone_context TimeZoneDefinition. Format: !{id: time_zone_identifier}
+    # @example
+    #   xb = EwsBuilder.new
+    #   xb.build! do |part, b|
+    #     if(part == :header)
+    #       b.nbuild.MyVar('blablabla')
+    #     else
+    #       b.folder_shape!({:base_shape => 'Default'})
+    #     end
+    #   end
+    def build!(opts = {}, &block)
+      @nbuild.Envelope(NAMESPACES) do |node|
+        node.parent.namespace = parent_namespace(node)
+        node.Header {
+          set_version_header! opts[:server_version]
+          set_impersonation! opts[:impersonation_type], opts[:impersonation_mail]
+          set_time_zone_context_header! opts[:time_zone_context]
+          yield(:header, self) if block_given?
+        }
+        node.Body {
+          yield(:body, self) if block_given?
+        }
+      end
+      @nbuild.doc
+    end
+
+    # Build XML from a passed in Hash or Array in a specified format.
+    # @param [Array,Hash] elems The elements to add to the Builder. They must
+    #   be specified like so:
+    #
+    #   !{:top =>
+    #     { :xmlns => 'http://stonesthrow/soap',
+    #       :sub_elements => [
+    #         {:elem1 => {:text => 'inside'}},
+    #         {:elem2 => {:text => 'inside2'}}
+    #       ],
+    #       :id => '3232', :tx_dd => 23, :asdf => 'turkey'
+    #     }
+    #   }
+    #   or
+    #   [ {:first => {:text => 'hello'}},
+    #     {:second => {:text => 'world'}}
+    #   ]
+    #
+    #   NOTE: there are specialized keys for text (:text), child elements
+    #   (:sub_elements) and namespaces (:xmlns).
+    def build_xml!(elems)
+      case elems.class.name
+        when 'Hash'
+          keys = elems.keys
+          vals = elems.values
+          if(keys.length > 1 && !vals.is_a?(Hash))
+            raise "invalid input: #{elems}"
+          end
+
+          vals = vals.first.clone
+          se = vals.delete(:sub_elements)
+          txt = vals.delete(:text)
+          xmlns_attribute = vals.delete(:xmlns_attribute)
+
+          node  = if keys.first.is_a? Symbol and respond_to? keys.first.to_s + "!"
+                    self.send keys.first.to_s+"!", vals.empty? ? txt : vals
+
+                  else
+                    # @nbuild.send(keys.first.to_s.camel_case, txt, vals) {|x|
+                    @nbuild.send(keys.first.to_s.classify, txt, vals) {|x|
+                      build_xml!(se) if se
+                    }
+                  end
+          # Set node level namespace
+          node.xmlns = NAMESPACES["xmlns:#{xmlns_attribute}"] if xmlns_attribute
+
+        when 'Array'
+          elems.each do |e|
+            build_xml!(e)
+          end
+        else
+          raise "Unsupported type: #{elems.class.name}"
+      end
+    end
+
+    # Build the FolderShape element
+    # @see http://msdn.microsoft.com/en-us/library/aa494311.aspx
+    # @param [Hash] folder_shape The folder shape structure to build from
+    # @todo need fully support all options
+    def folder_shape!(folder_shape)
+      @nbuild.FolderShape {
+        @nbuild.parent.default_namespace = @default_ns
+        base_shape!(folder_shape[:base_shape])
+        if(folder_shape[:additional_properties])
+          additional_properties!(folder_shape[:additional_properties])
+        end
+      }
+    end
+
+    # Build the ItemShape element
+    # @see http://msdn.microsoft.com/en-us/library/aa565261.aspx
+    # @param [Hash] item_shape The item shape structure to build from
+    # @todo need fully support all options
+    def item_shape!(item_shape)
+      @nbuild[NS_EWS_MESSAGES].ItemShape {
+        @nbuild.parent.default_namespace = @default_ns
+        base_shape!(item_shape[:base_shape])
+        mime_content!(item_shape[:include_mime_content]) if item_shape.has_key?(:include_mime_content)
+        body_type!(item_shape[:body_type]) if item_shape[:body_type]
+        if(item_shape[:additional_properties])
+          additional_properties!(item_shape[:additional_properties])
+        end
+      }
+    end
+
+    # Build the QueryString element
+    # @see http://msdn.microsoft.com/en-us/library/ee693615.aspx
+    # @param [String] query_string
+    # @todo need fully support all options (AND, OR)
+    def query_string!(query_string)
+      @nbuild[NS_EWS_MESSAGES].QueryString(query_string)
+    end
+
+    # Build the IndexedPageItemView element
+    # @see http://msdn.microsoft.com/en-us/library/exchange/aa563549(v=exchg.150).aspx
+    # @todo needs peer check
+    def indexed_page_item_view!(indexed_page_item_view)
+      attribs = {}
+      indexed_page_item_view.each_pair {|k,v| attribs[k.to_s.classify] = v.to_s}
+      @nbuild[NS_EWS_MESSAGES].IndexedPageItemView(attribs)
+    end
+
+    # Build the BaseShape element
+    # @see http://msdn.microsoft.com/en-us/library/aa580545.aspx
+    def base_shape!(base_shape)
+      @nbuild[NS_EWS_TYPES].BaseShape(base_shape.to_s.classify)
+    end
+
+    def mime_content!(include_mime_content)
+      @nbuild[NS_EWS_TYPES].IncludeMimeContent(include_mime_content.to_s.downcase)
+    end
+
+    def body_type!(body_type)
+      body_type = body_type.to_s
+      if body_type =~ /html/i
+        body_type = body_type.upcase
+      else
+        body_type = body_type.downcase.capitalize
+      end
+      nbuild[NS_EWS_TYPES].BodyType(body_type)
+    end
+
+    # Build the ParentFolderIds element
+    # @see http://msdn.microsoft.com/en-us/library/aa565998.aspx
+    def parent_folder_ids!(pfids)
+      @nbuild[NS_EWS_MESSAGES].ParentFolderIds {
+        pfids.each do |pfid|
+          dispatch_folder_id!(pfid)
+        end
+      }
+    end
+
+    # Build the ParentFolderId element
+    # @see http://msdn.microsoft.com/en-us/library/aa563268.aspx
+    def parent_folder_id!(pfid)
+      @nbuild.ParentFolderId {
+        dispatch_folder_id!(pfid)
+      }
+    end
+
+    # Build the FolderIds element
+    # @see http://msdn.microsoft.com/en-us/library/aa580509.aspx
+    def folder_ids!(fids, act_as=nil)
+      ns = @nbuild.parent.name.match(/subscription/i) ? NS_EWS_TYPES : NS_EWS_MESSAGES
+      @nbuild[ns].FolderIds {
+        fids.each do |fid|
+          fid[:act_as] = act_as if act_as != nil
+          dispatch_folder_id!(fid)
+        end
+      }
+    end
+
+    # Build the SyncFolderId element
+    # @see http://msdn.microsoft.com/en-us/library/aa580296.aspx
+    def sync_folder_id!(fid)
+      @nbuild.SyncFolderId {
+        dispatch_folder_id!(fid)
+      }
+    end
+
+    # Build the DistinguishedFolderId element
+    # @see http://msdn.microsoft.com/en-us/library/aa580808.aspx
+    # @todo add support for the Mailbox child object
+    def distinguished_folder_id!(dfid, change_key = nil, act_as = nil)
+      attribs = {'Id' => dfid.to_s}
+      attribs['ChangeKey'] = change_key if change_key
+      @nbuild[NS_EWS_TYPES].DistinguishedFolderId(attribs) {
+        if ! act_as.nil?
+          mailbox!({:email_address => act_as})
+        end
+      }
+    end
+
+    # Build the FolderId element
+    # @see http://msdn.microsoft.com/en-us/library/aa579461.aspx
+    def folder_id!(fid, change_key = nil)
+      attribs = {'Id' => fid}
+      attribs['ChangeKey'] = change_key if change_key
+      @nbuild[NS_EWS_TYPES].FolderId(attribs)
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa563525(v=EXCHG.140).aspx
+    def item_ids!(item_ids)
+      @nbuild.ItemIds {
+        item_ids.each do |iid|
+          dispatch_item_id!(iid)
+        end
+      }
+    end
+
+    def parent_item_id!(id)
+      nbuild.ParentItemId {|x|
+        x.parent['Id'] = id[:id]
+        x.parent['ChangeKey'] = id[:change_key] if id[:change_key]
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa580234(v=EXCHG.140).aspx
+    def item_id!(id)
+      nbuild[NS_EWS_TYPES].ItemId {|x|
+        x.parent['Id'] = id[:id]
+        x.parent['ChangeKey'] = id[:change_key] if id[:change_key]
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/ff709503(v=exchg.140).aspx
+    def export_item_ids!(item_ids)
+      ns = @nbuild.parent.name.match(/subscription/i) ? NS_EWS_TYPES : NS_EWS_MESSAGES
+      @nbuild[ns].ExportItems{
+        @nbuild.ItemIds {
+          item_ids.each do |iid|
+            dispatch_item_id!(iid)
+          end
+        }
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa580744(v=EXCHG.140).aspx
+    def occurrence_item_id!(id)
+      @nbuild[NS_EWS_TYPES].OccurrenceItemId {|x|
+        x.parent['RecurringMasterId'] = id[:recurring_master_id]
+        x.parent['ChangeKey'] = id[:change_key] if id[:change_key]
+        x.parent['InstanceIndex'] = id[:instance_index]
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa581019(v=EXCHG.140).aspx
+    def recurring_master_item_id!(id)
+      @nbuild[NS_EWS_TYPES].RecurringMasterItemId {|x|
+        x.parent['OccurrenceId'] = id[:occurrence_id]
+        x.parent['ChangeKey'] = id[:change_key] if id[:change_key]
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa565020(v=EXCHG.140).aspx
+    def to_folder_id!(to_fid)
+      @nbuild[NS_EWS_MESSAGES].ToFolderId {
+        dispatch_folder_id!(to_fid)
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa564009.aspx
+    def folders!(folders)
+      @nbuild.Folders {|x|
+        folders.each do |fold|
+          fold.each_pair do |ftype, vars| # convenience, should only be one pair
+            ftype = "#{ftype}!".to_sym
+            if self.respond_to? ftype
+              self.send ftype, vars
+            else
+              raise Viewpoint::EWS::EwsNotImplemented,
+                    "#{ftype} not implemented as a builder."
+            end
+          end
+        end
+      }
+    end
+
+    def folder!(folder, type = :Folder)
+      nbuild[NS_EWS_TYPES].send(type) {|x|
+        folder.each_pair do |e,v|
+          ftype = "#{e}!".to_sym
+          if e == :folder_id
+            dispatch_folder_id!(v)
+          elsif self.respond_to?(ftype)
+            self.send ftype, v
+          else
+            raise Viewpoint::EWS::EwsNotImplemented,
+                  "#{ftype} not implemented as a builder."
+          end
+        end
+      }
+    end
+
+    def calendar_folder!(folder)
+      folder! folder, :CalendarFolder
+    end
+
+    def contacts_folder!(folder)
+      folder! folder, :ContactsFolder
+    end
+
+    def search_folder!(folder)
+      folder! folder, :SearchFolder
+    end
+
+    def tasks_folder!(folder)
+      folder! folder, :TasksFolder
+    end
+
+    def display_name!(name)
+      nbuild[NS_EWS_TYPES].DisplayName(name)
+    end
+
+    # Build the AdditionalProperties element
+    # @see http://msdn.microsoft.com/en-us/library/aa563810.aspx
+    def additional_properties!(addprops)
+      @nbuild[NS_EWS_TYPES].AdditionalProperties {
+        addprops.each_pair {|k,v|
+          dispatch_field_uri!({k => v}, NS_EWS_TYPES)
+        }
+      }
+    end
+
+    # Build the Mailbox element.
+    # This element is commonly used for delegation. Typically passing an
+    #   email_address is sufficient
+    # @see http://msdn.microsoft.com/en-us/library/aa565036.aspx
+    # @param [Hash] mailbox A well-formated hash
+    def mailbox!(mbox)
+      nbuild[NS_EWS_TYPES].Mailbox {
+        name!(mbox[:name]) if mbox[:name]
+        email_address!(mbox[:email_address]) if mbox[:email_address]
+        address!(mbox[:address]) if mbox[:address] # for Availability query
+        routing_type!(mbox[:routing_type]) if mbox[:routing_type]
+        mailbox_type!(mbox[:mailbox_type]) if mbox[:mailbox_type]
+        item_id!(mbox[:item_id]) if mbox[:item_id]
+      }
+    end
+
+    def name!(name)
+      nbuild[NS_EWS_TYPES].Name(name)
+    end
+
+    def email_address!(email)
+      nbuild[NS_EWS_TYPES].EmailAddress(email)
+    end
+
+    def address!(email)
+      nbuild[NS_EWS_TYPES].Address(email)
+    end
+
+    # This is stupid. The only valid value is "SMTP"
+    def routing_type!(type)
+      nbuild[NS_EWS_TYPES].RoutingType(type)
+    end
+
+    def mailbox_type!(type)Standard
+    nbuild[NS_EWS_TYPES].MailboxType(type)
+    end
+
+    def user_oof_settings!(opts)
+      nbuild[NS_EWS_TYPES].UserOofSettings {
+        nbuild.OofState(opts[:oof_state].to_s.classify)
+        nbuild.ExternalAudience(opts[:external_audience].to_s.classify) if opts[:external_audience]
+        duration!(opts[:duration]) if opts[:duration]
+        nbuild.InternalReply {
+          nbuild.Message(opts[:internal_reply])
+        } if opts[:external_reply]
+        nbuild.ExternalReply {
+          nbuild.Message(opts[:external_reply])
+        } if opts[:external_reply]
+      }
+    end
+
+    def duration!(opts)
+      nbuild.Duration {
+        nbuild.StartTime(format_time opts[:start_time])
+        nbuild.EndTime(format_time opts[:end_time])
+      }
+    end
+
+    def mailbox_data!(md)
+      nbuild[NS_EWS_TYPES].MailboxData {
+        nbuild[NS_EWS_TYPES].Email {
+          mbox = md[:email]
+          name!(mbox[:name]) if mbox[:name]
+          address!(mbox[:address]) if mbox[:address] # for Availability query
+          routing_type!(mbox[:routing_type]) if mbox[:routing_type]
+        }
+        nbuild[NS_EWS_TYPES].AttendeeType 'Required'
+      }
+    end
+
+    def free_busy_view_options!(opts)
+      nbuild[NS_EWS_TYPES].FreeBusyViewOptions {
+        nbuild[NS_EWS_TYPES].TimeWindow {
+          nbuild[NS_EWS_TYPES].StartTime(format_time opts[:time_window][:start_time])
+          nbuild[NS_EWS_TYPES].EndTime(format_time opts[:time_window][:end_time])
+        }
+        nbuild[NS_EWS_TYPES].RequestedView(opts[:requested_view][:requested_free_busy_view].to_s.classify)
+      }
+    end
+
+    def suggestions_view_options!(opts)
+    end
+
+    def time_zone!(zone)
+      zone ||= {}
+      zone = {
+          bias: zone[:bias] || 480,
+          standard_time: {
+              bias: 0,
+              time: "02:00:00",
+              day_order: 5,
+              month: 10,
+              day_of_week: 'Sunday'
+          }.merge(zone[:standard_time] || {}),
+          daylight_time: {
+              bias: -60,
+              time: "02:00:00",
+              day_order: 1,
+              month: 4,
+              day_of_week: 'Sunday'
+          }.merge(zone[:daylight_time] || {})
+      }
+
+      nbuild[NS_EWS_TYPES].TimeZone {
+        nbuild[NS_EWS_TYPES].Bias(zone[:bias])
+        nbuild[NS_EWS_TYPES].StandardTime {
+          nbuild[NS_EWS_TYPES].Bias(zone[:standard_time][:bias])
+          nbuild[NS_EWS_TYPES].Time(zone[:standard_time][:time])
+          nbuild[NS_EWS_TYPES].DayOrder(zone[:standard_time][:day_order])
+          nbuild[NS_EWS_TYPES].Month(zone[:standard_time][:month])
+          nbuild[NS_EWS_TYPES].DayOfWeek(zone[:standard_time][:day_of_week])
+        }
+        nbuild[NS_EWS_TYPES].DaylightTime {
+          nbuild[NS_EWS_TYPES].Bias(zone[:daylight_time][:bias])
+          nbuild[NS_EWS_TYPES].Time(zone[:daylight_time][:time])
+          nbuild[NS_EWS_TYPES].DayOrder(zone[:daylight_time][:day_order])
+          nbuild[NS_EWS_TYPES].Month(zone[:daylight_time][:month])
+          nbuild[NS_EWS_TYPES].DayOfWeek(zone[:daylight_time][:day_of_week])
+        }
+      }
+    end
+
+    # Request all known time_zones from server
+    def get_server_time_zones!(get_time_zone_options)
+      nbuild[NS_EWS_MESSAGES].GetServerTimeZones('ReturnFullTimeZoneData' => get_time_zone_options[:full]) do
+        if get_time_zone_options[:ids] && get_time_zone_options[:ids].any?
+          nbuild[NS_EWS_MESSAGES].Ids do
+            get_time_zone_options[:ids].each do |id|
+              nbuild[NS_EWS_TYPES].Id id
+            end
+          end
+        end
+      end
+    end
+
+    # Specifies an optional time zone for the start time
+    # @param [Hash] attributes
+    # @option attributes :id [String] ID of the Microsoft well known time zone
+    # @option attributes :name [String] Optional name of the time zone
+    # @todo Implement sub elements Periods, TransitionsGroups and Transitions to override zone
+    # @see http://msdn.microsoft.com/en-us/library/exchange/dd899524.aspx
+    def start_time_zone!(zone)
+      attributes = {}
+      attributes['Id'] = zone[:id] if zone[:id]
+      attributes['Name'] = zone[:name] if zone[:name]
+      nbuild[NS_EWS_TYPES].StartTimeZone(attributes)
+    end
+
+    # Specifies an optional time zone for the end time
+    # @param [Hash] attributes
+    # @option attributes :id [String] ID of the Microsoft well known time zone
+    # @option attributes :name [String] Optional name of the time zone
+    # @todo Implement sub elements Periods, TransitionsGroups and Transitions to override zone
+    # @see http://msdn.microsoft.com/en-us/library/exchange/dd899434.aspx
+    def end_time_zone!(zone)
+      attributes = {}
+      attributes['Id'] = zone[:id] if zone[:id]
+      attributes['Name'] = zone[:name] if zone[:name]
+      nbuild[NS_EWS_TYPES].EndTimeZone(attributes)
+    end
+
+    # Specify a time zone
+    # @todo Implement subelements Periods, TransitionsGroups and Transitions to override zone
+    # @see http://msdn.microsoft.com/en-us/library/exchange/dd899488.aspx
+    def time_zone_definition!(zone)
+      attributes = {'Id' => zone[:id]}
+      attributes['Name'] = zone[:name] if zone[:name]
+      nbuild[NS_EWS_TYPES].TimeZoneDefinition(attributes)
+    end
+
+    # Build the Restriction element
+    # @see http://msdn.microsoft.com/en-us/library/aa563791.aspx
+    # @param [Hash] restriction a well-formatted Hash that can be fed to #build_xml!
+    def restriction!(restriction)
+      @nbuild[NS_EWS_MESSAGES].Restriction {
+        restriction.each_pair do |k,v|
+          self.send normalize_type(k), v
+        end
+      }
+    end
+
+    def and_r(expr)
+      and_or('And', expr)
+    end
+
+    def or_r(expr)
+      and_or('Or', expr)
+    end
+
+    def and_or(type, expr)
+      @nbuild[NS_EWS_TYPES].send(type) {
+        expr.each do |e|
+          type = e.keys.first
+          self.send normalize_type(type), e[type]
+        end
+      }
+    end
+
+    def not_r(expr)
+      @nbuild[NS_EWS_TYPES].Not {
+        type = expr.keys.first
+        self.send(type, expr[type])
+      }
+    end
+
+    def contains(expr)
+      @nbuild[NS_EWS_TYPES].Contains(
+          'ContainmentMode' => expr.delete(:containment_mode),
+          'ContainmentComparison' => expr.delete(:containment_comparison)) {
+        c = expr.delete(:constant) # remove constant 1st for ordering
+        type = expr.keys.first
+        self.send(type, expr[type])
+        constant(c)
+      }
+    end
+
+    def excludes(expr)
+      @nbuild[NS_EWS_TYPES].Excludes {
+        b = expr.delete(:bitmask) # remove bitmask 1st for ordering
+        type = expr.keys.first
+        self.send(type, expr[type])
+        bitmask(b)
+      }
+    end
+
+    def exists(expr)
+      @nbuild[NS_EWS_TYPES].Exists {
+        type = expr.keys.first
+        self.send(type, expr[type])
+      }
+    end
+
+    def bitmask(expr)
+      @nbuild[NS_EWS_TYPES].Bitmask('Value' => expr[:value])
+    end
+
+    def is_equal_to(expr)
+      restriction_compare('IsEqualTo',expr)
+    end
+
+    def is_greater_than(expr)
+      restriction_compare('IsGreaterThan',expr)
+    end
+
+    def is_greater_than_or_equal_to(expr)
+      restriction_compare('IsGreaterThanOrEqualTo',expr)
+    end
+
+    def is_less_than(expr)
+      restriction_compare('IsLessThan',expr)
+    end
+
+    def is_less_than_or_equal_to(expr)
+      restriction_compare('IsLessThanOrEqualTo',expr)
+    end
+
+    def is_not_equal_to(expr)
+      restriction_compare('IsNotEqualTo',expr)
+    end
+
+    def restriction_compare(type,expr)
+      nbuild[NS_EWS_TYPES].send(type) {
+        expr.each do |e|
+          e.each_pair do |k,v|
+            self.send(k, v)
+          end
+        end
+      }
+    end
+
+    def field_uRI(expr)
+      nbuild[NS_EWS_TYPES].FieldURI('FieldURI' => expr[:field_uRI])
+    end
+
+    def indexed_field_uRI(expr)
+      nbuild[NS_EWS_TYPES].IndexedFieldURI(
+          'FieldURI'    => expr[:field_uRI],
+          'FieldIndex'  => expr[:field_index]
+      )
+    end
+
+    def extended_field_uRI(expr)
+      nbuild[NS_EWS_TYPES].ExtendedFieldURI {
+        nbuild.parent['DistinguishedPropertySetId'] = expr[:distinguished_property_set_id] if expr[:distinguished_property_set_id]
+        nbuild.parent['PropertySetId'] = expr[:property_set_id] if expr[:property_set_id]
+        nbuild.parent['PropertyTag'] = expr[:property_tag] if expr[:property_tag]
+        nbuild.parent['PropertyName'] = expr[:property_name] if expr[:property_name]
+        nbuild.parent['PropertyId'] = expr[:property_id] if expr[:property_id]
+        nbuild.parent['PropertyType'] = expr[:property_type] if expr[:property_type]
+      }
+    end
+
+    def extended_properties!(eprops)
+      eprops.each {|ep| extended_property!(ep)}
+    end
+
+    def extended_property!(eprop)
+      nbuild[NS_EWS_TYPES].ExtendedProperty {
+        key = eprop.keys.grep(/extended/i).first
+        dispatch_field_uri!({key => eprop[key]}, NS_EWS_TYPES)
+        if eprop[:values]
+          nbuild.Values {
+            eprop[:values].each do |v|
+              value! v
+            end
+          }
+        elsif eprop[:value]
+          value! eprop[:value]
+        end
+      }
+    end
+
+    def value!(val)
+      nbuild[NS_EWS_TYPES].Value(val)
+    end
+
+    def field_uRI_or_constant(expr)
+      nbuild[NS_EWS_TYPES].FieldURIOrConstant {
+        type = expr.keys.first
+        self.send(type, expr[type])
+      }
+    end
+
+    def constant(expr)
+      nbuild[NS_EWS_TYPES].Constant('Value' => expr[:value])
+    end
+
+    # Build the CalendarView element
+    def calendar_view!(cal_view)
+      attribs = {}
+      cal_view.each_pair {|k,v| attribs[k.to_s.classify] = v.to_s}
+      @nbuild[NS_EWS_MESSAGES].CalendarView(attribs)
+    end
+
+    # Build the ContactsView element
+    def contacts_view!(con_view)
+      attribs = {}
+      con_view.each_pair {|k,v| attribs[k.to_s.classify] = v.to_s}
+      @nbuild[NS_EWS_MESSAGES].ContactsView(attribs)
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa579678(v=EXCHG.140).aspx
+    def event_types!(evtypes)
+      @nbuild[NS_EWS_TYPES].EventTypes {
+        evtypes.each do |et|
+          @nbuild[NS_EWS_TYPES].EventType(et.to_s.classify)
+        end
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa565886(v=EXCHG.140).aspx
+    def watermark!(wmark, ns = NS_EWS_TYPES)
+      @nbuild[ns].Watermark(wmark)
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa565201(v=EXCHG.140).aspx
+    def timeout!(tout)
+      @nbuild[NS_EWS_TYPES].Timeout(tout)
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa564048(v=EXCHG.140).aspx
+    def status_frequency!(freq)
+      @nbuild[NS_EWS_TYPES].StatusFrequency(freq)
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa566309(v=EXCHG.140).aspx
+    def uRL!(url)
+      @nbuild[NS_EWS_TYPES].URL(url)
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa563790(v=EXCHG.140).aspx
+    def subscription_id!(subid)
+      @nbuild.SubscriptionId(subid)
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa563455(v=EXCHG.140).aspx
+    def pull_subscription_request(subopts)
+      subscribe_all = subopts[:subscribe_to_all_folders] ? 'true' : 'false'
+      @nbuild.PullSubscriptionRequest('SubscribeToAllFolders' => subscribe_all) {
+        folder_ids!(subopts[:folder_ids]) if subopts[:folder_ids]
+        event_types!(subopts[:event_types]) if subopts[:event_types]
+        watermark!(subopts[:watermark]) if subopts[:watermark]
+        timeout!(subopts[:timeout]) if subopts[:timeout]
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa563599(v=EXCHG.140).aspx
+    def push_subscription_request(subopts)
+      subscribe_all = subopts[:subscribe_to_all_folders] ? 'true' : 'false'
+      @nbuild.PushSubscriptionRequest('SubscribeToAllFolders' => subscribe_all) {
+        folder_ids!(subopts[:folder_ids]) if subopts[:folder_ids]
+        event_types!(subopts[:event_types]) if subopts[:event_types]
+        watermark!(subopts[:watermark]) if subopts[:watermark]
+        status_frequency!(subopts[:status_frequency]) if subopts[:status_frequency]
+        uRL!(subopts[:uRL]) if subopts[:uRL]
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/ff406182(v=EXCHG.140).aspx
+    def streaming_subscription_request(subopts)
+      subscribe_all = subopts[:subscribe_to_all_folders] ? 'true' : 'false'
+      @nbuild.StreamingSubscriptionRequest('SubscribeToAllFolders' => subscribe_all) {
+        folder_ids!(subopts[:folder_ids]) if subopts[:folder_ids]
+        event_types!(subopts[:event_types]) if subopts[:event_types]
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa565970(v=EXCHG.140).aspx
+    def sync_state!(syncstate)
+      @nbuild.SyncState(syncstate)
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa563785(v=EXCHG.140).aspx
+    def ignore!(item_ids)
+      @nbuild.Ignore {
+        item_ids.each do |iid|
+          item_id!(iid)
+        end
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa566325(v=EXCHG.140).aspx
+    def max_changes_returned!(cnum)
+      @nbuild[NS_EWS_MESSAGES].MaxChangesReturned(cnum)
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/dd899531(v=EXCHG.140).aspx
+    def sync_scope!(scope)
+      @nbuild.SyncScope(scope)
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa580758(v=EXCHG.140).aspx
+    def saved_item_folder_id!(fid)
+      @nbuild.SavedItemFolderId {
+        dispatch_folder_id!(fid)
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa565652(v=exchg.140).aspx
+    def item!(item)
+      nbuild.Item {
+        item.each_pair {|k,v|
+          self.send("#{k}!", v)
+        }
+      }
+    end
+
+    def message!(item)
+      nbuild[NS_EWS_TYPES].Message {
+        if item[:extended_properties]
+          extended_properties! item.delete(:extended_properties)
+        end
+        item.each_pair {|k,v|
+          self.send("#{k}!", v)
+        }
+      }
+    end
+
+    def calendar_item!(item)
+      nbuild[NS_EWS_TYPES].CalendarItem {
+        item.each_pair {|k,v|
+          self.send("#{k}!", v)
+        }
+      }
+    end
+
+    def contact!(item)
+      nbuild[NS_EWS_TYPES].Contact {
+        item.each_pair {|k,v|
+          self.send("#{k}!", v)
+        }
+      }
+    end
+
+    def task!(item)
+      nbuild[NS_EWS_TYPES].Task {
+        item.each_pair {|k,v|
+          self.send("#{k}!", v)
+        }
+      }
+    end
+
+    def forward_item!(item)
+      nbuild[NS_EWS_TYPES].ForwardItem {
+        item.each_pair {|k,v|
+          self.send("#{k}!", v)
+        }
+      }
+    end
+
+    def reply_to_item!(item)
+      nbuild[NS_EWS_TYPES].ReplyToItem {
+        item.each_pair {|k,v|
+          self.send("#{k}!", v)
+        }
+      }
+    end
+
+    def reply_all_to_item!(item)
+      nbuild[NS_EWS_TYPES].ReplyAllToItem {
+        item.each_pair {|k,v|
+          self.send("#{k}!", v)
+        }
+      }
+    end
+
+    def reference_item_id!(id)
+      nbuild[NS_EWS_TYPES].ReferenceItemId {|x|
+        x.parent['Id'] = id[:id]
+        x.parent['ChangeKey'] = id[:change_key] if id[:change_key]
+      }
+    end
+
+    def subject!(sub)
+      nbuild[NS_EWS_TYPES].Subject(sub)
+    end
+
+    def file_as!(file_as)
+      puts "Builder file_as: #{file_as.to_yaml}"
+      nbuild[NS_EWS_TYPES].FileAs(file_as)
+    end
+
+    def file_as_mapping!(file_as_mapping)
+      nbuild[NS_EWS_TYPES].FileAsMapping(file_as_mapping.to_s.classify)
+    end
+
+    def first_name!(first_name)
+      nbuild[NS_EWS_TYPES].FirstName(first_name)
+    end
+
+    def given_name!(given_name)
+      nbuild[NS_EWS_TYPES].GivenName(given_name)
+    end
+
+    def middle_name!(middle_name)
+      nbuild[NS_EWS_TYPES].MiddleName(middle_name)
+    end
+
+    def last_name!(last_name)
+      nbuild[NS_EWS_TYPES].LastName(last_name)
+    end
+
+    def surname!(surname)
+      nbuild[NS_EWS_TYPES].Surname(surname)
+    end
+
+    def job_title!(job_title)
+      nbuild[NS_EWS_TYPES].JobTitle(job_title)
+    end
+
+    def complete_name!(complete_name)
+      puts "Builder complete name: #{complete_name.to_yaml}"
+      puts "Builder complete_name full_name: #{complete_name[:full_name]}"
+
+      nbuild[NS_EWS_TYPES].CompleteName{
+        title!(complete_name[:title])                    if complete_name[:title]
+        first_name!(complete_name[:given_name])          if complete_name[:given_name]
+        middle_name!(complete_name[:middle_name])        if complete_name[:fmiddle_name]
+        last_name!(complete_name[:last_name])            if complete_name[:last_name]
+        nbuild[NS_EWS_TYPES].Suffix(complete_name[:suffix])                 if complete_name[:suffix]
+        nbuild[NS_EWS_TYPES].Initials(complete_name[:initials])             if complete_name[:initials]
+        nbuild[NS_EWS_TYPES].FullName(complete_name[:full_name])            if complete_name[:full_name]
+        nbuild[NS_EWS_TYPES].Nickname(complete_name[:nickname])             if complete_name[:nickname]
+        nbuild[NS_EWS_TYPES].YomiFirstName(complete_name[:yomi_first_name]) if complete_name[:yomi_first_name]
+        nbuild[NS_EWS_TYPES].YomiLastName(complete_name[:yomi_last_name])   if complete_name[:yomi_last_name]
+      }
+    end
+
+    def company_name!(company_name)
+      nbuild[NS_EWS_TYPES].CompanyName(company_name)
+    end
+
+    def physical_addresses!(addresses)
+      nbuild[NS_EWS_TYPES].PhysicalAddresses{
+        addresses.each do |type, value|
+          # if value.respond_to?( deep_compact ) && !value.deep_compact.empty?
+          nbuild[NS_EWS_TYPES].Entry(:Key => type.to_s.classify){
+            nbuild[NS_EWS_TYPES].Street(value[:street])                     if value[:street]
+            nbuild[NS_EWS_TYPES].City(value[:city])                         if value[:city]
+            nbuild[NS_EWS_TYPES].State(value[:state])                       if value[:state]
+            nbuild[NS_EWS_TYPES].CountryOrRegion(value[:country_or_region]) if value[:country_or_region]
+            nbuild[NS_EWS_TYPES].PostalCode(value[:postal_code])            if value[:postal_code]
+          }
+          # end
+        end
+      }
+    end
+
+    def importance!(sub)
+      nbuild[NS_EWS_TYPES].Importance(sub)
+    end
+
+    def body!(b)
+      nbuild[NS_EWS_TYPES].Body(b[:text]) {|x|
+        x.parent['BodyType'] = b[:body_type] if b[:body_type]
+      }
+    end
+
+    def new_body_content!(b)
+      nbuild[NS_EWS_TYPES].NewBodyContent(b[:text]) {|x|
+        x.parent['BodyType'] = b[:body_type] if b[:body_type]
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa563719(v=exchg.140).aspx
+    # @param [Array] r An array of Mailbox type hashes to send to #mailbox!
+    def to_recipients!(r)
+      nbuild[NS_EWS_TYPES].ToRecipients {
+        r.each {|mbox| mailbox!(mbox[:mailbox]) }
+      }
+    end
+
+    def cc_recipients!(r)
+      nbuild[NS_EWS_TYPES].CcRecipients {
+        r.each {|mbox| mailbox!(mbox[:mailbox]) }
+      }
+    end
+
+    def bcc_recipients!(r)
+      nbuild[NS_EWS_TYPES].BccRecipients {
+        r.each {|mbox| mailbox!(mbox[:mailbox]) }
+      }
+    end
+
+    def from!(f)
+      nbuild[NS_EWS_TYPES].From {
+        mailbox! f
+      }
+    end
+
+    def required_attendees!(attendees)
+      nbuild[NS_EWS_TYPES].RequiredAttendees {
+        attendees.each {|a| attendee!(a[:attendee])}
+      }
+    end
+
+    def optional_attendees!(attendees)
+      nbuild[NS_EWS_TYPES].OptionalAttendees {
+        attendees.each {|a| attendee!(a[:attendee])}
+      }
+    end
+
+    def resources!(attendees)
+      nbuild[NS_EWS_TYPES].Resources {
+        attendees.each {|a| attendee!(a[:attendee])}
+      }
+    end
+
+    # @todo support ResponseType, LastResponseTime: http://msdn.microsoft.com/en-us/library/aa580339.aspx
+    def attendee!(a)
+      nbuild[NS_EWS_TYPES].Attendee {
+        mailbox!(a[:mailbox])
+      }
+    end
+
+    def start!(st)
+      nbuild[NS_EWS_TYPES].Start(st[:text])
+    end
+
+    def end!(et)
+      nbuild[NS_EWS_TYPES].End(et[:text])
+    end
+
+    def start_date!(sd)
+      nbuild[NS_EWS_TYPES].StartDate format_time(sd[:text])
+    end
+
+    def due_date!(dd)
+      nbuild[NS_EWS_TYPES].DueDate format_time(dd[:text])
+    end
+
+    def location!(loc)
+      nbuild[NS_EWS_TYPES].Location(loc)
+    end
+
+    def is_all_day_event!(all_day)
+      nbuild[NS_EWS_TYPES].IsAllDayEvent(all_day)
+    end
+
+    def reminder_is_set!(reminder)
+      nbuild[NS_EWS_TYPES].ReminderIsSet reminder
+    end
+
+    def reminder_due_by!(date)
+      nbuild[NS_EWS_TYPES].ReminderDueBy format_time(date)
+    end
+
+    def reminder_minutes_before_start!(minutes)
+      nbuild[NS_EWS_TYPES].ReminderMinutesBeforeStart minutes
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa566143(v=exchg.150).aspx
+    # possible values Exchange Server 2010 = [Free, Tentative, Busy, OOF, NoData]
+    #                 Exchange Server 2013 = [Free, Tentative, Busy, OOF, WorkingElsewhere, NoData]
+    def legacy_free_busy_status!(state)
+      nbuild[NS_EWS_TYPES].LegacyFreeBusyStatus(state)
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa563540(v=exchg.150).aspx
+    # possible keys: assistant_phone, business_fax, business_phone, business_phone2, callback, carPhone, company_main_phone
+    #                home_fax, home_phone, home_phone2, isdn, mobile_phone, other_fax, other_telephone, pager, primary_phone
+    #                radio_phone, telex, tty_tdd_phone
+    def phone_numbers!(phone_numbers)
+      nbuild[NS_EWS_TYPES].PhoneNumbers {
+        phone_numbers.each do |type, number|
+          nbuild[NS_EWS_TYPES].Entry(number, :Key => type.to_s.classify)
+        end
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa563540(v=exchg.150).aspx
+    # possible keys: assistant_phone, business_fax, business_phone, business_phone2, callback, carPhone, company_main_phone
+    #                home_fax, home_phone, home_phone2, isdn, mobile_phone, other_fax, other_telephone, pager, primary_phone
+    #                radio_phone, telex, tty_tdd_phone
+    def email_addresses!(email)
+      nbuild[NS_EWS_TYPES].EmailAddresses {
+        email.each do |type, address|
+          nbuild[NS_EWS_TYPES].Entry(address, :Key => type.to_s.classify)
+        end
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa565428(v=exchg.140).aspx
+    def item_changes!(changes)
+      nbuild.ItemChanges {
+        changes.each do |chg|
+          item_change!(chg)
+        end
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa581081(v=exchg.140).aspx
+    def item_change!(change)
+      @nbuild[NS_EWS_TYPES].ItemChange {
+        updates = change.delete(:updates) # Remove updates so dispatch_item_id works correctly
+        dispatch_item_id!(change)
+        updates!(updates)
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa581074(v=exchg.140).aspx
+    def updates!(updates)
+      @nbuild[NS_EWS_TYPES].Updates {
+        updates.each do |update|
+          dispatch_update_type!(update)
+        end
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa581317(v=exchg.140).aspx
+    def append_to_item_field!(upd)
+      uri = upd.select {|k,v| k =~ /_uri/i}
+      raise EwsBadArgumentError, "Bad argument given for AppendToItemField." if uri.keys.length != 1
+      upd.delete(uri.keys.first)
+      @nbuild.AppendToItemField {
+        dispatch_field_uri!(uri)
+        dispatch_field_item!(upd)
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa581487(v=exchg.140).aspx
+    def set_item_field!(upd)
+      uri = upd.select {|k,v| k =~ /_uri/i}
+      raise EwsBadArgumentError, "Bad argument given for SetItemField." if uri.keys.length != 1
+      upd.delete(uri.keys.first)
+      @nbuild[NS_EWS_TYPES].SetItemField {
+        dispatch_field_uri!(uri, NS_EWS_TYPES)
+        dispatch_field_item!(upd, NS_EWS_TYPES)
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa580330(v=exchg.140).aspx
+    def delete_item_field!(upd)
+      uri = upd.select {|k,v| k =~ /_uri/i}
+      raise EwsBadArgumentError, "Bad argument given for SetItemField." if uri.keys.length != 1
+      @nbuild[NS_EWS_TYPES].DeleteItemField {
+        dispatch_field_uri!(uri, NS_EWS_TYPES)
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/ff709497(v=exchg.140).aspx
+    def return_new_item_ids!(retval)
+      @nbuild.ReturnNewItemIds(retval)
+    end
+
+    def file_attachment!(fa)
+      @nbuild[NS_EWS_TYPES].FileAttachment {
+        @nbuild.Name(fa.name)
+        @nbuild.Content(fa.content)
+      }
+    end
+
+    def item_attachment!(ia)
+      @nbuild[NS_EWS_TYPES].ItemAttachment {
+        @nbuild.Name(ia.name)
+        @nbuild.Item {
+          item_id!(ia.item)
+        }
+      }
+    end
+
+    # Build the AttachmentIds element
+    # @see http://msdn.microsoft.com/en-us/library/aa580686.aspx
+    def attachment_ids!(aids)
+      @nbuild.AttachmentIds {
+        @nbuild.parent.default_namespace = @default_ns
+        aids.each do |aid|
+          attachment_id!(aid)
+        end
+      }
+    end
+
+    # Build the AttachmentId element
+    # @see http://msdn.microsoft.com/en-us/library/aa580764.aspx
+    def attachment_id!(aid)
+      attribs = {'Id' => aid}
+      @nbuild[NS_EWS_TYPES].AttachmentId(attribs)
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa565620(v=exchg.140).aspx
+    def folder_changes!(changes)
+      nbuild.FolderChanges {
+        changes.each do |chg|
+          folder_change!(chg)
+        end
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa494297(v=exchg.140).aspx
+    def folder_change!(change)
+      @nbuild[NS_EWS_TYPES].FolderChange {
+        updates = change.delete(:updates) # Remove updates so dispatch_item_id works correctly
+        dispatch_folder_id!(change[:folder_id])
+        updates_folder!(updates)
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa564758(v=exchg.140).aspx
+    def updates_folder!(updates)
+      @nbuild[NS_EWS_TYPES].Updates {
+        updates.each do |update|
+          dispatch_update_type_folder!(update)
+        end
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa581338(v=exchg.140).aspx
+    # The AppendToFolderField element is not implemented. Any request that uses this element will always return an error response.
+    def append_to_folder_field!(upd)
+      raise Viewpoint::EWS::EwsNotImplemented,
+            "The AppendToFolderField element is not implemented."
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa581582(v=exchg.140).aspx
+    def set_folder_field!(upd)
+      uri = upd.select {|k,v| k =~ /_uri/i}
+      raise EwsBadArgumentError, "Bad argument given for SetFolderField." if uri.keys.length != 1
+      upd.delete(uri.keys.first)
+      @nbuild[NS_EWS_TYPES].SetFolderField {
+        dispatch_field_uri!(uri, NS_EWS_TYPES)
+        dispatch_field_item!(upd, NS_EWS_TYPES)
+      }
+    end
+
+    # @see http://msdn.microsoft.com/en-us/library/aa566408(v=exchg.140).aspx
+    def delete_folder_field!(upd)
+      uri = upd.select {|k,v| k =~ /_uri/i}
+      raise EwsBadArgumentError, "Bad argument given for DeleteFolderField." if uri.keys.length != 1
+      @nbuild[NS_EWS_TYPES].DeleteFoField {
+        dispatch_field_uri!(uri, NS_EWS_TYPES)
+      }
+    end
+
+    def user_configuration_name!(cfg_name)
+      attribs = {'Name' => cfg_name.delete(:name)}
+      @nbuild[NS_EWS_MESSAGES].UserConfigurationName(attribs) {
+        fid = cfg_name.keys.first
+        self.send "#{fid}!", cfg_name[fid][:id], cfg_name[fid][:change_key]
+      }
+    end
+
+    def user_configuration_properties!(cfg_prop)
+      @nbuild[NS_EWS_MESSAGES].UserConfigurationProperties(cfg_prop)
+    end
+
+    # ---------------------- Helpers -------------------- #
+
+    # A helper method to dispatch to a FolderId or DistinguishedFolderId correctly
+    # @param [Hash] fid A folder_id
+    #   Ex: {:id => myid, :change_key => ck}
+    def dispatch_folder_id!(fid)
+      if(fid[:id].is_a?(String))
+        folder_id!(fid[:id], fid[:change_key])
+      elsif(fid[:id].is_a?(Symbol))
+        distinguished_folder_id!(fid[:id], fid[:change_key], fid[:act_as])
+      else
+        raise EwsBadArgumentError, "Bad argument given for a FolderId. #{fid[:id].class}"
+      end
+    end
+
+    # A helper method to dispatch to an ItemId, OccurrenceItemId, or a RecurringMasterItemId
+    # @param [Hash] iid The item id of some type
+    def dispatch_item_id!(iid)
+      type = iid.keys.first
+      item = iid[type]
+      case type
+        when :item_id
+          item_id!(item)
+        when :occurrence_item_id
+          occurrence_item_id!(
+              item[:recurring_master_id], item[:change_key], item[:instance_index])
+        when :recurring_master_item_id
+          recurring_master_item_id!(item[:occurrence_id], item[:change_key])
+        else
+          raise EwsBadArgumentError, "Bad ItemId type. #{type}"
+      end
+    end
+
+    # A helper method to dispatch to a AppendToItemField, SetItemField, or
+    #   DeleteItemField
+    # @param [Hash] update An update of some type
+    def dispatch_update_type!(update)
+      type = update.keys.first
+      upd  = update[type]
+      case type
+        when :append_to_item_field
+          append_to_item_field!(upd)
+        when :set_item_field
+          set_item_field!(upd)
+        when :delete_item_field
+          delete_item_field!(upd)
+        else
+          raise EwsBadArgumentError, "Bad Update type. #{type}"
+      end
+    end
+
+    # A helper method to dispatch to a AppendToFolderField, SetFolderField, or
+    #   DeleteFolderField
+    # @param [Hash] update An update of some type
+    def dispatch_update_type_folder!(update)
+      type = update.keys.first
+      upd  = update[type]
+      case type
+        when :append_to_folder_field
+          append_to_folder_field!(upd)
+        when :set_folder_field
+          set_folder_field!(upd)
+        when :delete_folder_field
+          delete_folder_field!(upd)
+        else
+          raise EwsBadArgumentError, "Bad Update type. #{type}"
+      end
+    end
+
+    # A helper to dispatch to a FieldURI, IndexedFieldURI, or an ExtendedFieldURI
+    # @todo Implement ExtendedFieldURI
+    def dispatch_field_uri!(uri, ns=NS_EWS_MESSAGES)
+      type = uri.keys.first
+      vals = uri[type].is_a?(Array) ? uri[type] : [uri[type]]
+      case type
+        when :field_uRI, :field_uri
+          vals.each do |val|
+            nbuild[ns].FieldURI('FieldURI' => val[type])
+          end
+        when :indexed_field_uRI, :indexed_field_uri
+          vals.each do |val|
+            nbuild[ns].IndexedFieldURI('FieldURI' => val[:field_uRI], 'FieldIndex' => val[:field_index])
+          end
+        when :extended_field_uRI, :extended_field_uri
+          vals.each do |val|
+            nbuild[ns].ExtendedFieldURI {
+              nbuild.parent['DistinguishedPropertySetId'] = val[:distinguished_property_set_id] if val[:distinguished_property_set_id]
+              nbuild.parent['PropertySetId'] = val[:property_set_id] if val[:property_set_id]
+              nbuild.parent['PropertyTag'] = val[:property_tag] if val[:property_tag]
+              nbuild.parent['PropertyName'] = val[:property_name] if val[:property_name]
+              nbuild.parent['PropertyId'] = val[:property_id] if val[:property_id]
+              nbuild.parent['PropertyType'] = val[:property_type] if val[:property_type]
+            }
+          end
+        else
+          raise EwsBadArgumentError, "Bad URI type. #{type}"
+      end
+    end
+
+    # Insert item, enforce xmlns attribute if prefix is present
+    def dispatch_field_item!(item, ns_prefix = nil)
+      item.values.first[:xmlns_attribute] = ns_prefix if ns_prefix
+      build_xml!(item)
+    end
+
+    def room_list!(cfg_prop)
+      @nbuild[NS_EWS_MESSAGES].RoomList {
+        email_address!(cfg_prop)
+      }
+    end
+
+    def room_lists!
+      @nbuild[NS_EWS_MESSAGES].GetRoomLists
+    end
+
+
+    private
+
+    def parent_namespace(node)
+      node.parent.namespace_definitions.find {|ns| ns.prefix == NS_SOAP}
+    end
+
+    def set_version_header!(version)
+      if version && !(version == 'none')
+        nbuild[NS_EWS_TYPES].RequestServerVersion {|x|
+          x.parent['Version'] = version
+        }
+      end
+    end
+
+    def set_impersonation!(type, address)
+      if type && type != ""
+        nbuild[NS_EWS_TYPES].ExchangeImpersonation {
+          nbuild[NS_EWS_TYPES].ConnectingSID {
+            nbuild[NS_EWS_TYPES].method_missing type, address
+          }
+        }
+      end
+    end
+
+    # Set TimeZoneContext Header
+    # @param time_zone_def [Hash] !{id: time_zone_identifier, name: time_zone_name}
+    def set_time_zone_context_header!(time_zone_def)
+      if time_zone_def
+        nbuild[NS_EWS_TYPES].TimeZoneContext do
+          time_zone_definition! time_zone_def
+        end
+      end
+    end
+
+    # some methods need special naming so they use the '_r' suffix like 'and'
+    def normalize_type(type)
+      case type
+        when :and, :or, :not
+          "#{type}_r".to_sym
+        else
+          type
+      end
+    end
+
+    def format_time(time)
+      case time
+        when Time, Date, DateTime
+          time.to_datetime.new_offset(0).iso8601
+        when String
+          begin
+            DateTime.parse(time).new_offset(0).iso8601
+          rescue ArgumentError
+            raise EwsBadArgumentError, "Invalid Time argument (#{time})"
+          end
+        else
+          raise EwsBadArgumentError, "Invalid Time argument (#{time})"
+      end
+    end
+
+  end # EwsBuilder
+end # Viewpoint::EWS::SOAP

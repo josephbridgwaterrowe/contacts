@@ -1,0 +1,157 @@
+<% contact = @contact %>
+<div class="container">
+  <div class="row">
+    <div class="col-lg-12" id="contact-header">
+      <div class="page-header">
+        <h3>Contact<small></small>
+        <span class="pull-right">
+          <%= link_to 'Back', params[:return_url] || contacts_path(),
+                      class: 'btn btn-default' %>
+        </span>
+        </h3>
+      </div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-lg-12" id="contact-detail">
+      <form class="form-horizontal">
+        <fieldset>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">First Name</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.first_name %></p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Initials</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.initials %></p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Last Name</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.last_name %></p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Display Name</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.display_name %></p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Description</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.description %></p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Office</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.office %></p>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Email Address</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.email_address %></p>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Phone Number</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= number_to_phone(contact.phone_number, area_code: true) %></p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Pager Number</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= number_to_phone(contact.pager_number, area_code: true) %></p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Mobile Number</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= number_to_phone(contact.mobile_number, area_code: true) %></p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Fax Number</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= number_to_phone(contact.fax_number, area_code: true) %></p>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Address</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.street_address %></p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">City</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.city %></p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">State</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.region %></p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Zip Code</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.postal_code %></p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Country</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.country %></p>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Company</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.company %></p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Department</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.department %></p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Job Title</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.job_title %></p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Manager</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.manager %></p>
+            </div>
+          </div>
+
+
+
+          <div class="form-group">
+            <label class="col-lg-4 control-label">Active</label>
+            <div class="col-lg-8">
+              <p class="form-control-static"><%= contact.active? %></p>
+            </div>
+          </div>
+        </fieldset>
+      </form>
+    </div>
+  </div>
+
+</div>

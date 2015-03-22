@@ -1,0 +1,41 @@
+<div class="container">
+  <div class="row">
+    <div class="col-lg-3">
+    </div>
+    <div class="col-lg-6">
+      <div>
+        <%= simple_form_for(resource,
+                           :as => resource_name,
+                           :url => confirmation_path(resource_name),
+                           :html => { :class => 'form-horizontal', :method => :post }) do |f| %>
+            <div class="page-header">
+              <h3>Resend confirmation instructions<small></small>
+                <span class="pull-right">
+                  <input type="submit" class="btn btn-primary" value="Send" />
+                </span>
+              </h3>
+            </div>
+
+            <%= f.error_notification %>
+            <%= devise_error_messages! %>
+
+            <fieldset>
+              <%= f.input :reset_password_token, :as => :hidden %>
+              <%= f.full_error :reset_password_token %>
+
+              <%= f.input :email,
+                          :autofocus => true,
+                          :controls_html => { :class => 'col-lg-8' },
+                          :input_html => { :class => 'form-control', :type => :email },
+                          :label => 'Email address',
+                          :label_html => { :class => 'col-lg-4' },
+                          :required => true %>
+            </fieldset>
+        <% end %>
+        <%= render "devise/shared/links" %>
+      </div>
+    </div>
+    <div class="col-lg-3">
+    </div>
+  </div>
+</div>

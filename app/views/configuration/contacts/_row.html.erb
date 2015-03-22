@@ -1,0 +1,40 @@
+<tr>
+  <td nowrap><%= contact.display_name %>
+  </td>
+  <td><%= contact.company %></td>
+  <td><%= location(contact) %></td>
+  <td><%= contact.email_address %></td>
+  <td><% if contact.phone_number.present? %><%= number_to_phone(contact.phone_number, area_code: true) %><br /><% end %></td>
+  <td><% if contact.mobile_number.present? %><%= number_to_phone(contact.mobile_number, area_code: true) %><br /><% end %></td>
+  <% if 0 == 1 %>
+  <td nowrap>
+    <% if contact.email_address.present? %>E: <%= contact.email_address %><br /><% end %>
+    <% if contact.phone_number.present? %>P: <%= number_to_phone(contact.phone_number, area_code: true) %><br /><% end %>
+    <% if contact.mobile_number.present? %>M: <%= number_to_phone(contact.mobile_number, area_code: true) %><br /><% end %>
+    <% if contact.fax_number.present? %>F: <%= number_to_phone(contact.fax_number, area_code: true) %><br /><% end %>
+  </td>
+  <td><%= contact.company %></td>
+  <td><%= contact.department %></td>
+  <td><%= contact.job_title %></td>
+  <td><%= contact.manager %></td>
+  <% end %>
+  <td nowrap>
+    <% if can?(:delete, Contact) %>
+        <%= link_to configuration_contact_path(contact),
+                    class: 'btn btn-danger btn-icon btn-sm hidden-print',
+                    data: { confirm: 'Are you sure?' }, method: :delete do %>
+            <span class="glyphicon glyphicon-trash"></span>
+        <% end %>
+    <% end %>
+    <% if can?(:update, Contact) %>
+    <%= link_to edit_configuration_contact_path(contact, return_url: request.original_url),
+                class: 'btn btn-default btn-icon btn-sm hidden-print' do %>
+        <span class="glyphicon glyphicon-pencil"></span>
+    <% end %>
+    <% end %>
+    <%= link_to configuration_contact_path(contact, return_url: request.original_url),
+                class: 'btn btn-default btn-icon btn-sm hidden-print' do %>
+        <span class="glyphicon glyphicon-eye-open"></span>
+    <% end %>
+  </td>
+</tr>

@@ -1,0 +1,16 @@
+<% if model.errors.any? %>
+    <div id="error_explanation" class="alert alert-danger">
+      <h4 class="alert-heading">
+        <% if local_assigns.has_key?(:error_message) && error_message %>
+        <%= error_message %>
+        <% else %>
+        <%= pluralize(model.errors.count, 'error') %> prohibited the item from being changed:
+        <% end %>
+      </h4>
+      <ul>
+        <% model.errors.full_messages.each do |msg| %>
+            <li><%= msg %></li>
+        <% end %>
+      </ul>
+    </div>
+<% end %>
