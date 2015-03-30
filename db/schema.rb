@@ -50,8 +50,9 @@ ActiveRecord::Schema.define(version: 20150322154716) do
     t.integer  "managing_contact_id"
     t.string   "external_reference"
     t.string   "external_source"
-    t.datetime "created_at"
-    t.datetime "updated_at"
+    t.datetime "deleted_at"
+    t.datetime "created_at",                              null: false
+    t.datetime "updated_at",                              null: false
     t.string   "contact_type",        default: "unknown", null: false
     t.integer  "company_id"
     t.integer  "department_id"
