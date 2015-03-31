@@ -1,0 +1,8 @@
+default: &default
+  adapter: mysql2
+  username: travis
+  encoding: utf8
+
+test:
+  <<: *default
+  database: contacts_test

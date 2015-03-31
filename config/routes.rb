@@ -1,19 +1,19 @@
 Rails.application.routes.draw do
   devise_for :users,
              skip: [:registrations]
-  # devise_scope :user do
-  #   match '/users/sign_out', as: :destroy_user_session, to: 'devise/sessions#destroy', via: :delete
-  # end
 
   root to: 'contacts#index'
 
-  resources :contacts, only: [:index, :show]
+  resources :contacts, :only => [:index, :show]
+  resources :departments, :only => [:index]
 
   namespace :admin do
     resources :users
   end
 
   namespace :configuration do
+    resources :companies
     resources :contacts
+    resources :departments
   end
 end

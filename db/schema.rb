@@ -19,6 +19,12 @@ ActiveRecord::Schema.define(version: 20150322154716) do
     t.datetime "updated_at"
   end
 
+  create_table "companies", force: true do |t|
+    t.string   "name",       null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
   create_table "contacts", force: true do |t|
     t.integer  "address_book_id",                         null: false
     t.string   "first_name"
@@ -38,40 +44,49 @@ ActiveRecord::Schema.define(version: 20150322154716) do
     t.string   "postal_code"
     t.string   "country"
     t.string   "job_title"
-    t.string   "department"
-    t.string   "company"
+    t.string   "department_name"
+    t.string   "company_name"
     t.integer  "is_active",           default: 1,         null: false
     t.integer  "managing_contact_id"
     t.string   "external_reference"
     t.string   "external_source"
     t.datetime "deleted_at"
-    t.datetime "created_at"
-    t.datetime "updated_at"
+    t.datetime "created_at",                              null: false
+    t.datetime "updated_at",                              null: false
     t.string   "contact_type",        default: "unknown", null: false
+    t.integer  "company_id"
+    t.integer  "department_id"
+  end
+
+  create_table "departments", force: true do |t|
+    t.integer  "company_id", null: false
+    t.string   "name",       null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "users", force: true do |t|
-    t.string   "first_name",                          null: false
-    t.string   "last_name",                           null: false
-    t.string   "name",                                null: false
-    t.integer  "is_active",              default: 1,  null: false
+    t.string   "email",                   default: "", null: false
+    t.string   "first_name",                           null: false
+    t.string   "last_name",                            null: false
+    t.string   "name",                                 null: false
+    t.integer  "is_active",               default: 1,  null: false
     t.string   "roles"
     t.string   "provider"
     t.string   "uid"
-    t.string   "email",                  default: "", null: false
-    t.string   "reset_password_token"
-    t.datetime "reset_password_sent_at"
     t.datetime "remember_created_at"
     t.string   "remember_token"
-    t.integer  "sign_in_count",          default: 0,  null: false
+    t.string   "reset_password_token"
+    t.datetime "resent_password_sent_at"
+    t.integer  "sign_in_count",           default: 0,  null: false
     t.datetime "current_sign_in_at"
     t.datetime "last_sign_in_at"
     t.string   "current_sign_in_ip"
     t.string   "last_sign_in_ip"
-    t.datetime "created_at",                          null: false
+    t.datetime "created_at",                           null: false
     t.datetime "deleted_at"
-    t.datetime "updated_at",                          null: false
-    t.string   "encrypted_password",                  null: false
+    t.datetime "updated_at",                           null: false
+    t.string   "encrypted_password",                   null: false
     t.string   "confirmation_token"
     t.datetime "confirmed_at"
     t.datetime "confirmation_sent_at"
@@ -80,6 +95,5 @@ ActiveRecord::Schema.define(version: 20150322154716) do
 
   add_index "users", ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true, using: :btree
   add_index "users", ["email"], name: "index_users_on_email", unique: true, using: :btree
-  add_index "users", ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true, using: :btree
 
 end

@@ -1,8 +1,13 @@
+# Represents a Contact.
 class Contact < ActiveRecord::Base
   acts_as_paranoid
 
   belongs_to :address_book
+  belongs_to :company
+  belongs_to :department
   belongs_to :manager, class_name: Contact, foreign_key: :managing_contact_id
+
+  validates :display_name, :presence => true
 
   def active?
     is_active.to_i == 1

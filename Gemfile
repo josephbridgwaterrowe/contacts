@@ -1,12 +1,7 @@
 source 'https://rubygems.org'
 ruby '2.2.1'
 
-group :development, :test do
-  gem 'dotenv-rails',
-      :github => 'bkeepers/dotenv',
-      :require => 'dotenv/rails-now'
-end
-
+gem 'bcrypt', '~> 3.1.10'
 gem 'bootstrap-sass'
 gem 'bootstrap-sass-extras'
 gem 'cancancan'
@@ -16,8 +11,9 @@ gem 'devise'
 gem 'figaro'
 gem 'jbuilder'
 gem 'jquery-rails'
+gem 'json', '~> 1.8.2'
 gem 'letter_opener'
-gem 'mysql'
+gem 'mysql2'
 gem 'omniauth'
 gem 'omniauth-oauth2', '1.0.3'
 gem 'paranoia', '~> 2.0'
@@ -45,7 +41,6 @@ gem 'phony_rails'
 group :development do
   gem 'capistrano', '~> 3.2.0'
   gem 'capistrano-bundler', '~> 1.1.0'
-  gem 'capistrano-rvm'
   gem 'capistrano-rails', '~> 1.1'
 end
 

@@ -1,0 +1,36 @@
+var contacts = []
+
+$('.contact button.clear-typeahead').on('click', function() {
+    $($(this).data('clear-typeahead-value')).val('');
+    $($(this).data('clear-typeahead-text')).val('');
+});
+
+$('.contact .typeahead').typeahead({
+    items: 10,
+    source: function ( query, process ) {
+        $.getJSON( '<%= contacts_path() %>',
+                {
+                    q: {
+                        display_name_cont: query
+                    },
+                    limit: this.options.items
+                }, function ( data ) {
+
+                    var labels = [];
+
+                    $.each( data, function( index, item ){
+                        labels.push( item.to_s );
+                        //also store a mapping to get from label back to ID
+                        contacts[ item.to_s ] = item;
+                    });
+
+                    process( labels );
+                });
+    }
+    , updater: function (selectedItem) {
+        var item = contacts[selectedItem]
+        $('input[id*=contact_id]').val(item.id);
+
+        return item.to_s;
+    }
+});

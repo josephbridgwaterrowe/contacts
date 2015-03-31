@@ -1,3 +1,14 @@
+<% if 0 == 1 %>
+<div style="padding: 50px; text-align: center;">
+  <%- if devise_mapping.omniauthable? %>
+      <%- resource_class.omniauth_providers.each do |provider| %>
+          <%= link_to "Sign in with #{provider.to_s.titleize}",
+                      omniauth_authorize_path(resource_name, provider),
+                      class: 'btn btn-primary' %><br />
+      <% end -%>
+  <% end -%>
+</div>
+<% end %>
 <div class="container">
   <div class="row">
     <div class="col-lg-3">
@@ -13,7 +24,6 @@
               </h3>
             </div>
 
-            <%= f.error_notification %>
             <%= devise_error_messages! %>
 
             <fieldset>
@@ -35,7 +45,9 @@
 
             </fieldset>
         <% end %>
-        <%= render "devise/shared/links" %>
+        <%- if devise_mapping.recoverable? && controller_name != 'passwords' %>
+            <%= link_to 'Forgot your password?', new_password_path(resource_name) %><br />
+        <% end -%>
       </div>
     </div>
     <div class="col-lg-3">

@@ -1,15 +1,12 @@
 lock '3.2.1'
 
-set :application, 'contact-manager'
+set :application, 'contacts'
 set :repo_url, ''
 
 set :branch, 'master'
 
-set :user, ''
-set :deploy_to, ''
-
-set :rvm_type, :user
-set :rvm_ruby_version, 'ruby-2.1.2@contact-app'
+set :user, 'deploy'
+set :deploy_to, '/var/www/contacts'
 
 set :linked_files, %w{config/application.yml config/database.yml config/secrets.yml}
 set :linked_dirs, %w{bin log tmp/pids tmp/cache tmp/sockets vendor/bundle public/system}
@@ -25,6 +22,15 @@ namespace :deploy do
 
       within release_path do
         execute :bundle, :exec, :whenever, '--write-crontab'
+      end
+    end
+  end
+
+  after :publishing, :link_www do
+    on roles(:app) do
+      within release_path do
+        execute :rm, '-f', '/var/www/current'
+        execute :ln, '-s', release_path, '/var/www/current'
       end
     end
   end
