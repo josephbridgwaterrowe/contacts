@@ -1,2 +1,0 @@
-module Configuration::CompaniesHelper
-end

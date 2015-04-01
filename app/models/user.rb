@@ -1,7 +1,8 @@
 class User < ActiveRecord::Base
   before_save :set_name
 
-  devise :confirmable,
+  devise :invitable,
+         :confirmable,
          :database_authenticatable,
          :recoverable,
          :rememberable,

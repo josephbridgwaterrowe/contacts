@@ -1,2 +1,0 @@
-module Configuration::ContactsHelper
-end

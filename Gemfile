@@ -8,11 +8,11 @@ gem 'cancancan'
 gem 'daemons'
 gem 'daemons-rails'
 gem 'devise'
+gem 'devise_invitable'
 gem 'figaro'
 gem 'jbuilder'
 gem 'jquery-rails'
 gem 'json', '~> 1.8.2'
-gem 'letter_opener'
 gem 'mysql2'
 gem 'omniauth'
 gem 'omniauth-oauth2', '1.0.3'
@@ -42,6 +42,10 @@ group :development do
   gem 'capistrano', '~> 3.2.0'
   gem 'capistrano-bundler', '~> 1.1.0'
   gem 'capistrano-rails', '~> 1.1'
+end
+
+group :development, :test do
+  gem 'letter_opener'
 end
 
 group :test do
