@@ -1,6 +1,7 @@
 Rails.application.routes.draw do
   devise_for :users,
-             skip: [:registrations]
+             :controllers => { :invitations => 'invitations' },
+             :skip => [:registrations]
 
   root to: 'contacts#index'
 
