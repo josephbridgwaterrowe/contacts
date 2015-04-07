@@ -53,8 +53,8 @@ namespace :contact_manager do
         contact.postal_code = entry[:postalcode].first if entry[:postalcode].any?
         contact.country = get_ldap_value(entry[:co])
         contact.job_title = entry[:title].first if entry[:title].any?
-        contact.department = entry[:department].first if entry[:department].any?
-        contact.company = entry[:company].first if entry[:company].any?
+        contact.department_name = entry[:department].first if entry[:department].any?
+        contact.company_name = entry[:company].first if entry[:company].any?
         contact.external_reference = entry.dn
         contact.external_source = 'ldap'
 
@@ -112,8 +112,12 @@ namespace :contact_manager do
         ops << get_ldap_replace(:postalcode, contact.postal_code)
         ops << get_ldap_replace(:co, contact.country)
         ops << get_ldap_replace(:title, contact.job_title)
-        ops << get_ldap_replace(:department, contact.department)
-        ops << get_ldap_replace(:company, contact.company)
+        if contact.department
+          ops << get_ldap_replace(:department, contact.department.name)
+        end
+        if contact.company
+          ops << get_ldap_replace(:company, contact.company.name)
+        end
         manager_dn = contact.manager.external_reference if contact.manager
         ops << get_ldap_replace(:manager, manager_dn)
 
