@@ -10,7 +10,7 @@ module Configuration
 
       if @department.save
         redirect_to(configuration_department_path(@department.id),
-                    :notice => t('app.department.create.success'))
+                    :notice => t('contacts.department.create.success'))
       else
         render :new
       end
@@ -31,7 +31,7 @@ module Configuration
     def update
       if @department.update_attributes(department_params)
         redirect_to(configuration_department_path(@department.id),
-                    :notice => t('app.department.update.success'))
+                    :notice => t('contacts.department.update.success'))
       else
         render :edit
       end

@@ -15,7 +15,7 @@ feature 'User creates a new company' do
 
       click_on 'Save'
 
-      expect(page).to have_content(I18n.t('app.company.create.success'))
+      expect(page).to have_content(I18n.t('contacts.company.create.success'))
     end
   end
 

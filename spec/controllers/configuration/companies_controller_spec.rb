@@ -99,7 +99,7 @@ RSpec.describe Configuration::CompaniesController, :type => :controller do
       it { is_expected.to respond_with(302) }
       it { is_expected.to redirect_to(configuration_company_path(company.id)) }
       # rubocop:disable Metrics/LineLength
-      it { is_expected.to set_flash[:notice].to(I18n.t('app.company.create.success')) }
+      it { is_expected.to set_flash[:notice].to(I18n.t('contacts.company.create.success')) }
       # rubocop:enable Metrics/LineLength
     end
 

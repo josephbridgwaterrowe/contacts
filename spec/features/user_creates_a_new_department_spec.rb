@@ -19,7 +19,7 @@ feature 'User creates a new department' do
 
       click_on 'Save'
 
-      expect(page).to have_content(I18n.t('app.department.create.success'))
+      expect(page).to have_content(I18n.t('contacts.department.create.success'))
     end
   end
 

@@ -16,7 +16,7 @@ feature 'User edits an existing company' do
 
       click_on 'Save'
 
-      expect(page).to have_content(I18n.t('app.company.update.success'))
+      expect(page).to have_content(I18n.t('contacts.company.update.success'))
     end
   end
 

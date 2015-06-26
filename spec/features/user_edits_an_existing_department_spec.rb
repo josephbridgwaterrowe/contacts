@@ -20,7 +20,7 @@ feature 'User edits an existing department' do
 
       click_on 'Save'
 
-      expect(page).to have_content(I18n.t('app.department.update.success'))
+      expect(page).to have_content(I18n.t('contacts.department.update.success'))
     end
   end
 

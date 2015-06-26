@@ -9,7 +9,7 @@ module Configuration
 
       if @company.save
         redirect_to(configuration_company_path(@company.id),
-                    :notice => t('app.company.create.success'))
+                    :notice => t('contacts.company.create.success'))
       else
         render :new
       end
@@ -30,7 +30,7 @@ module Configuration
     def update
       if @company.update_attributes(company_params)
         redirect_to(configuration_company_path(@company.id),
-                    :notice => t('app.company.update.success'))
+                    :notice => t('contacts.company.update.success'))
       else
         render :edit
       end
