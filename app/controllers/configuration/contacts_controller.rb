@@ -2,25 +2,29 @@ class Configuration::ContactsController < ApplicationController
   authorize_resource :contact
 
   before_action :find_contact, :only => [:destroy, :edit, :show, :update]
+  before_action :build_contact_entry, :only => [:create, :edit, :new, :update]
   before_action :populate_lists
-  before_action :load_companies, :only => [:create, :new, :edit, :update]
-  before_action :load_departments, :only => [:create, :new, :edit, :update]
 
   def create
-    @contact = Contact.new(contact_params)
-    if @contact.save
-      redirect_to(configuration_contact_path(@contact.id),
-                  :notice => t('app.contact.create.success'))
+    return render :new unless @contact_entry.valid?
+
+    context = CreateContact.call(contact_params)
+
+    if context.success?
+      redirect_to(contact_path(context.contact), :notice => context.message)
     else
+      flash[:alert] = context.message
       render :new
     end
   end
 
   def destroy
     if @contact.destroy
-      redirect_to(configuration_contacts_path(), notice: 'Contact removed')
+      redirect_to(configuration_contacts_path(),
+        :notice => t('contacts.contact.destroy.success'))
     else
-      redirect_to(configuration_contacts_path(), notice: 'Contact not removed')
+      redirect_to(configuration_contacts_path(),
+        :notice => t('contacts.contact.destroy.failure'))
     end
   end
 
@@ -56,9 +60,11 @@ class Configuration::ContactsController < ApplicationController
   def show; end
 
   def update
+    return render :edit unless @contact_entry.valid?
+
     if @contact.update_attributes(contact_params)
       redirect_to(configuration_contact_path(@contact.id),
-                  :notice => t('app.contact.update.success'))
+                  :notice => t('contacts.contact.update.success'))
     else
       render :edit
     end
@@ -66,35 +72,20 @@ class Configuration::ContactsController < ApplicationController
 
   private
 
+  def build_contact_entry
+    @contact_entry =  ContactEntry.new(
+      (@contact || Contact.new)
+        .attributes
+        .symbolize_keys
+        .slice(*param_keys)
+        .merge(contact_params)
+    )
+  end
+
   def contact_params
     params.
-        require(:contact).
-        permit(:contact_type,
-               :description,
-               :first_name,
-               :initials,
-               :last_name,
-               :office,
-               :display_name,
-               :email_address,
-               :pager_number,
-               :phone_number,
-               :mobile_number,
-               :fax_number,
-               :street_address,
-               :city,
-               :region,
-               :state,
-               :postal_code,
-               :company_id,
-               :department_id,
-               :company,
-               :department,
-               :company_name,
-               :department_name,
-               :job_title,
-               :managing_contact_id,
-               :is_active)
+        require(:contact_entry).
+        permit(param_keys)
   rescue ActionController::ParameterMissing; {}
   end
 
@@ -102,17 +93,36 @@ class Configuration::ContactsController < ApplicationController
     @contact = Contact.find(params[:id])
   end
 
-  def load_companies
-    @companies = Company.order { name }.to_a
-  end
-
-  def load_departments
-    return @departments = [] if @contact.company.nil?
-
-    @departments = Department
-      .where { company_id == my { @contact.company_id } }
-      .order { name }
-      .to_a
+  def param_keys
+    [
+      :contact_type,
+      :description,
+      :first_name,
+      :initials,
+      :last_name,
+      :office,
+      :display_name,
+      :email_address,
+      :pager_number,
+      :phone_number,
+      :mobile_number,
+      :managing_contact_name,
+      :fax_number,
+      :street_address,
+      :city,
+      :region,
+      :state,
+      :postal_code,
+      :company_id,
+      :department_id,
+      :company,
+      :department,
+      :company_name,
+      :department_name,
+      :job_title,
+      :managing_contact_id,
+      :is_active
+    ]
   end
 
   def populate_lists

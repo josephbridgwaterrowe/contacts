@@ -1,2 +1,31 @@
 en:
-  hello: "Hello world"
+  contacts:
+    company:
+      create:
+        success: "The company was successfully created."
+        failure: "We're sorry but there was a problem creating the company."
+      destroy:
+        success: "The company was successfully deleted."
+        failure: "We're sorry but there was a problem deleting the company."
+      update:
+        success: "The company was successfully updated."
+        failure: "We're sorry but there was a problem updating the company."
+    contact:
+      create:
+        success: "The contact was successfully created."
+        failure: "We're sorry but there was a problem creating the contact."
+        invalid: "We're sorry but your contact doesn't look quite right."
+      destroy:
+        success: "The contact was successfully deleted."
+        failure: "We're sorry but there was a problem deleting the contact."
+      update:
+        success: "The contact was successfully updated."
+        failure: "We're sorry but there was a problem updating the contact."
+        invalid: "We're sorry but your contact doesn't look quite right."
+    department:
+      create:
+        success: "The department was successfully created."
+        failure: "We're sorry but there was a problem creating the department."
+      update:
+        success: "The department was successfully updated."
+        failure: "We're sorry but there was a problem updating the department."

@@ -17,6 +17,12 @@ class Contact < ActiveRecord::Base
     write_attribute(:fax_number, value ? value.gsub(/\D/, '') : nil)
   end
 
+  def managing_contact_name
+    return nil if manager.nil?
+
+    manager.display_name
+  end
+
   def mobile_number=(value)
     write_attribute(:mobile_number, value ? value.gsub(/\D/, '') : nil)
   end
